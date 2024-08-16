@@ -3,12 +3,29 @@ const https = require('https');
 const { URL } = require('url');
 require('dotenv').config();
 
+const allowedOrigins = [
+    'http://localhost:3000',
+    'https://dev.teus-group.com',
+    'https://teus-group.com'
+];
+
 // Create a server to handle incoming requests
 const server = http.createServer((request, response) => {
     // Set CORS headers
-    response.setHeader('Access-Control-Allow-Origin', '*');
+    const origin = request.headers.origin;
+
+    // Log the incoming request details
+    console.log(`Incoming Request:`);
+    console.log(`Origin: ${origin}`);
+    console.log(`Method: ${request.method}`);
+    console.log(`URL: ${request.url}`);
+
+    if (allowedOrigins.includes(origin)) {
+        response.setHeader('Access-Control-Allow-Origin', origin);
+    }
     response.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     response.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    response.setHeader('Access-Control-Allow-Credentials', 'true');
 
     // Handle OPTIONS method (for CORS preflight requests)
     if (request.method === 'OPTIONS') {
