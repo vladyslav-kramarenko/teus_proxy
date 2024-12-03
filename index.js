@@ -204,6 +204,7 @@ function handleEmailRequest(request, response) {
 
 // Handle HubSpot API request
 function handleHubspotRequest(request, response) {
+    try{
     let body = '';
 
     request.on('data', chunk => {
@@ -222,6 +223,11 @@ function handleHubspotRequest(request, response) {
                 'Content-Length': Buffer.byteLength(body),
             },
         };
+        
+        
+        console.log("Making HubSpot API request...");
+        //console.log("Request options:", options);
+        console.log("Request body:", body);
 
         const hubspotRequest = https.request(options, hubspotResponse => {
             let hubspotData = '';
@@ -231,11 +237,38 @@ function handleHubspotRequest(request, response) {
             });
 
             hubspotResponse.on('end', () => {
-                response.writeHead(hubspotResponse.statusCode, {
-                    ...hubspotResponse.headers,
-                    'Access-Control-Allow-Origin': '*',
-                });
-                response.end(hubspotData);
+                
+                //console.log("HubSpot API response status:", hubspotResponse.statusCode);
+                //console.log("HubSpot API response headers:", hubspotResponse.headers);
+                ..console.log("HubSpot API response body:", hubspotData);
+                
+                if (hubspotResponse.statusCode === 409) {
+                    try {
+                        const conflictData = JSON.parse(hubspotData);
+                        const existingContactId = conflictData.message.match(/ID: (\d+)/)?.[1];
+                        if (existingContactId) {
+                            //console.log("Extracted Contact ID:", existingContactId);
+                            response.writeHead(200, { 'Content-Type': 'application/json' });
+                            response.end(JSON.stringify({ id: existingContactId }));
+                        } else {
+                            console.error("Unable to extract contact ID from conflict response.");
+                            response.writeHead(500, { 'Content-Type': 'application/json' });
+                            response.end(JSON.stringify({ error: 'Conflict but no contact ID provided' }));
+                        }
+                    } catch (error) {
+                        console.error("Error handling conflict response:", error);
+                        response.writeHead(500, { 'Content-Type': 'application/json' });
+                        response.end(JSON.stringify({ error: 'Failed to parse conflict response' }));
+                    }
+                }  else {
+                    response.writeHead(hubspotResponse.statusCode, {
+                        ...hubspotResponse.headers,
+                        'Access-Control-Allow-Origin': '*',
+                    });
+                    //response.end(JSON.stringify({ id: successData.id }));
+                    response.end(hubspotData);
+                    // console.log(hubspotData);
+                }
             });
         });
 
@@ -248,6 +281,9 @@ function handleHubspotRequest(request, response) {
         hubspotRequest.write(body);
         hubspotRequest.end();
     });
+    }catch (error){
+        console.error(error);
+    }
 }
 
 // Handle other CRM API request
@@ -267,7 +303,7 @@ function handleGPlusRequest(request, response) {
             name: crmData.name,
             phone: crmData.phone,
             email: crmData.email,
-            building_id: process.env.BUILDING_ID,
+            building_id: crmData.building_id || process.env.BUILDING_ID,
             lang: crmData.lang || 'en',
             note: crmData.note,
             adv_id: crmData.adv_id || process.env.DEFAULT_ADV_ID,
